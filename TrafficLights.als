@@ -61,12 +61,6 @@ fact {
     no disj r1, r2: Road | r1.direct = r2.direct
 }
 
-// If traffic light is red, pedestrian light should be 'Walk'
-fact {
-    all r: Road, t: TrafficLight, p: PedestrianLight | 
-        (t.isAbove = r && p.isAbove = r && t.isColor = Red) => p.walkState = Walk
-}
-
 // If traffic light is green or yellow, pedestrian light should be 'DontWalk'
 fact {
     all r: Road, t: TrafficLight, p: PedestrianLight | 
@@ -89,7 +83,7 @@ fact {
 
 //each road need at least one traffic light above it
 fact {
-    all r: Road | #(r.~isAbove & LeftTurnLight) >= 1
+    all r: Road | #(r.~isAbove & TrafficLight) >= 1
 }
 
 //each road should have only one ped light
@@ -97,10 +91,17 @@ fact {
     all r: Road | #(r.~isAbove & PedestrianLight) >= 1
 }
 
+//each road should have only one leftturn light
+fact {
+    all r: Road | #(r.~isAbove & LeftTurnLight) >= 1
+}
 
-//shouldn't have a walk sign when green left on other road
-fact {}
-
+//there shouldn't be a walk light on any road if there is a greenleft on any road
+fact {
+    all l: LeftTurnLight | 
+        (l.leftState = GreenLeft) => 
+            (all r: Road, p: (r.~isAbove & PedestrianLight) | p.walkState = DontWalk)
+}
 
 pred show {
 
@@ -110,7 +111,7 @@ pred showGreenLeftLight {
 }
 
 pred showTwoGreenLeftLights {
-    some disj l1, l2: LeftTurnLight | l1.leftState = GreenLeft and l2.leftState = GreenLeft
+    some disj l1, l2: LeftTurnLight | l1.leftState = Red and l2.leftState = Red
 }
 
 
