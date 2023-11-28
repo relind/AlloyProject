@@ -123,12 +123,12 @@ pred show {
 
 }
 
-//intersection with a protected left
+//intersection with a protected left that's green
 pred showGreenLeftLight {
     some l: LeftTurnLight | l.leftState = GreenLeft
 }
 
-//intersection with 2 protected left **just realized this shouldn't exist**
+//intersection with 2 protected left (shouldn't exist)
 pred showTwoGreenLeftLights {
     some disj l1, l2: LeftTurnLight | l1.leftState = GreenLeft and l2.leftState = GreenLeft
 
@@ -139,6 +139,11 @@ pred diffColor {
     some r: Road | some disj t1, t2: (r.~isAbove & TrafficLight) | t1.isColor != t2.isColor
 }
 
+//intersection with a green light
+pred oneGreen {
+    some l: TrafficLight | l.isColor = Green
+}
+
 run diffColor for 4 TrafficLight, 2 Road, 8 Light
 
 run showTwoGreenLeftLights for exactly 2 Road, exactly 2 TrafficLight, exactly 2 LeftTurnLight, exactly 2 PedestrianLight
@@ -146,3 +151,5 @@ run showTwoGreenLeftLights for exactly 2 Road, exactly 2 TrafficLight, exactly 2
 run showGreenLeftLight for exactly 2 Road, exactly 2 TrafficLight, exactly 2 LeftTurnLight, exactly 2 PedestrianLight
 
 run show for exactly 2 Road, 6 Light
+
+run oneGreen for exactly 2 Road, 8 Light
