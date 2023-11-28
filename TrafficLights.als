@@ -72,7 +72,7 @@ fact {
     all r: Road | #(r.~isAbove & LeftTurnLight) = 1
 }
 
-//a leftturnlight can only be greenleft if all the normal lights on both roads are red
+
 //a leftturnlight can only be greenleft if all the normal lights on both roads are red
 fact {
     all l: LeftTurnLight | 
@@ -96,10 +96,10 @@ fact {
     all r: Road | #(r.~isAbove & LeftTurnLight) >= 1
 }
 
-//there shouldn't be a walk light on any road if there is a greenleft on any road
+//there shouldn't be a walk light on any road if there is a greenleft or yellowleft on any road
 fact {
     all l: LeftTurnLight | 
-        (l.leftState = GreenLeft) => 
+        (l.leftState in GreenLeft + YellowLeft) => 
             (all r: Road, p: (r.~isAbove & PedestrianLight) | p.walkState = DontWalk)
 }
 
@@ -107,11 +107,12 @@ pred show {
 
 }
 pred showGreenLeftLight {
-    some l: LeftTurnLight | l.leftState = GreenLeft
+    some l: PedestrianLight | l.walkState = Walk
 }
 
 pred showTwoGreenLeftLights {
     some disj l1, l2: LeftTurnLight | l1.leftState = Red and l2.leftState = Red
+
 }
 
 
@@ -119,4 +120,4 @@ run showTwoGreenLeftLights for exactly 2 Road, exactly 2 TrafficLight, exactly 2
 
 run showGreenLeftLight for exactly 2 Road, exactly 2 TrafficLight, exactly 2 LeftTurnLight, exactly 2 PedestrianLight
 
-//run show for exactly 2 Road, exactly 2 TrafficLight, exactly 2 LeftTurnLight, exactly 2 PedestrianLight
+run show for exactly 2 Road, 6 Light
