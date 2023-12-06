@@ -3,6 +3,21 @@ sig Road {
     direct: one Direction
 }
 
+//get lights above roads
+fun lightsAbove(r: Road): set Light {
+  r.~isAbove & Light
+}
+
+//check if lights on the same roads have different colors
+fun lightsOnSameRoadDifferentColors[r: Road, t1, t2: TrafficLight]: set Color {
+  { c: Color | (t1.isAbove = r && t2.isAbove = r && t1.isColor = c && t2.isColor != c) }
+}
+
+//get pedestrian light above a road
+fun pedestrianLightAbove(r: Road): set PedestrianLight {
+  r.~isAbove & PedestrianLight
+}
+
 //parent sigs
 abstract sig Color {}
 abstract sig Direction {}
@@ -14,6 +29,13 @@ one sig NS, EW extends Direction {}
 //parent sig for lights
 abstract sig Light {
     isAbove: one Road
+}
+
+//check if two left turn lights on the same road have different states
+fun leftTurnLightsOnSameRoadDifferentStates[r: Road, l1, l2: LeftTurnLight]: set LeftTurnColor {
+  { state: LeftTurnColor | 
+    (l1.isAbove = r && l2.isAbove = r && l1.leftState = state && l2.leftState != state)
+  }
 }
 
 // Adding left turn light
@@ -43,18 +65,18 @@ sig PedestrianLight extends Light{
 
 //lights on different streets can't be green, yellow or green and yellow at the same time
 fact {
-    all disj r1, r2: Road | 
-        (r1.direct != r2.direct) => 
-            (all l1: r1.~isAbove, l2: r2.~isAbove | 
-                (l1 in TrafficLight && l2 in TrafficLight) => 
-                    !(l1.isColor in Green + Yellow && l2.isColor in Green + Yellow))
+  all disj r1, r2: Road | 
+    (r1.direct != r2.direct) => 
+      (all l1: lightsAbove[r1], l2: lightsAbove[r2] | 
+        (l1 in TrafficLight && l2 in TrafficLight) => 
+          !(l1.isColor in Green + Yellow && l2.isColor in Green + Yellow))
 }
 
-//all traffic lights on the same road should be the same color
+// all traffic lights on the same road should be the same color
 fact {
-    all r: Road, c: Color | 
-        (some l: r.~isAbove | l in TrafficLight && l.isColor = c) => 
-            (all l: r.~isAbove | l in TrafficLight => l.isColor = c)
+  all r: Road, c: Color | 
+    (some l: lightsAbove[r] | l in TrafficLight && l.isColor = c) => 
+      (all l: lightsAbove[r] | l in TrafficLight => l.isColor = c)
 }
 
 //There should be 2 roads
@@ -69,25 +91,18 @@ fact {
 
 // If traffic light is green or yellow, pedestrian light should be 'DontWalk'
 fact {
-    all r: Road, t: TrafficLight, p: PedestrianLight | 
-        (t.isAbove = r && p.isAbove = r && t.isColor in Green + Yellow) => p.walkState = DontWalk
+  all r: Road, t: lightsAbove[r], p: pedestrianLightAbove[r] | 
+    (t in TrafficLight && t.isColor in Green + Yellow) => p.walkState = DontWalk
 }
 
-//there should only be one left turn light above each road
+// there should only be one left turn light above each road
 fact {
     all r: Road | #(r.~isAbove & LeftTurnLight) = 1
 }
 
 
 
-//a leftturnlight can only be yellowleft or greenleft if all other traffic lights and left lights are red
-fact {
-    all l: LeftTurnLight |
-        (l.leftState in YellowLeft + GreenLeft) =>
-            (all r: Road, t: (r.~isAbove & TrafficLight) | t.isColor = Red) 
-}
-
-//a left turn light can only be greenleft or yellowleft is all other lefttrunlights are red
+// a left turn light can only be greenleft or yellowleft if all other left turn lights are red
 fact {
     all l: LeftTurnLight |
         (l.leftState in YellowLeft + GreenLeft) =>
@@ -96,7 +111,7 @@ fact {
 
 
 
-//each road need at least one traffic light above it
+// each road need at least one traffic light above it
 fact {
     all r: Road | #(r.~isAbove & TrafficLight) >= 1
 }
@@ -116,6 +131,25 @@ fact {
     all l: LeftTurnLight | 
         (l.leftState in GreenLeft + YellowLeft) => 
             (all r: Road, p: (r.~isAbove & PedestrianLight) | p.walkState = DontWalk)
+}
+
+assert allTrafficLightsSameColor {
+  all r: Road, t1, t2: TrafficLight |
+    (t1.isAbove = r && t2.isAbove = r && t1 != t2) =>
+      t1.isColor = t2.isColor
+}
+
+assert twoRoadsExist {
+  #Road = 2
+}
+
+assert noSameDirectionStreets {
+  no disj r1, r2: Road | r1.direct = r2.direct
+}
+
+assert pedestrianLightMatchesTrafficLight {
+  all r: Road, t: TrafficLight, p: PedestrianLight |
+    (t.isAbove = r && p.isAbove = r && t.isColor in Green + Yellow) => p.walkState = DontWalk
 }
 
 //random intersection
@@ -144,12 +178,47 @@ pred oneGreen {
     some l: TrafficLight | l.isColor = Green
 }
 
-run diffColor for 4 TrafficLight, 2 Road, 8 Light
 
-run showTwoGreenLeftLights for exactly 2 Road, exactly 2 TrafficLight, exactly 2 LeftTurnLight, exactly 2 PedestrianLight
+//DYNAMIC PREDICATES
 
-run showGreenLeftLight for exactly 2 Road, exactly 2 TrafficLight, exactly 2 LeftTurnLight, exactly 2 PedestrianLight
+// Dynamic Predicate 1: Traffic light changes its color
+pred trafficLightChangesColor[t, t1: TrafficLight, c: Color] {
+    t.isColor = c and t1 = t
+}
 
-run show for exactly 2 Road, 6 Light
+// Dynamic Predicate 2: Pedestrian light changes its state
+pred pedestrianLightChangesState[p, p1: PedestrianLight, s: PedestrianWalkState] {
+    p.walkState = s and p1 = p
+}
 
-run oneGreen for exactly 2 Road, 8 Light
+// Dynamic Predicate 3: Left turn light changes its state
+pred leftTurnLightChangesState[l, l1: LeftTurnLight, ls: LeftTurnColor] {
+    l.leftState = ls and l1 = l
+}
+
+// Dynamic Predicate 4: Road changes its direction
+pred roadChangesDirection[r, r1: Road, d: Direction] {
+    r.direct = d and r1 = r
+}
+
+// Run Dynamic Predicate 1: Traffic light changes its color
+//run trafficLightChangesColor for exactly 2 Road, exactly 4 TrafficLight, exactly 2 PedestrianLight, exactly 8 Light
+
+// Run Dynamic Predicate 2: Pedestrian light changes its state
+//run pedestrianLightChangesState for exactly 2 Road, exactly 4 TrafficLight, exactly 2 PedestrianLight, exactly 8 Light
+
+// Run Dynamic Predicate 3: Left turn light changes its state
+//run leftTurnLightChangesState for exactly 2 Road, exactly 4 TrafficLight, exactly 2 PedestrianLight, exactly 2 LeftTurnLight
+
+// Run Dynamic Predicate 4: Road changes its direction
+run roadChangesDirection for exactly 2 Road, exactly 2 Direction, exactly 4 TrafficLight, exactly 2 PedestrianLight, exactly 8 Light
+
+//run diffColor for 4 TrafficLight, 2 Road, 8 Light
+
+//run showTwoGreenLeftLights for exactly 2 Road, exactly 2 TrafficLight, exactly 2 LeftTurnLight, exactly 2 PedestrianLight
+
+//run showGreenLeftLight for exactly 2 Road, exactly 2 TrafficLight, exactly 2 LeftTurnLight, exactly 2 PedestrianLight
+
+//run show for exactly 2 Road, 6 Light
+
+//run oneGreen for exactly 2 Road, 8 Light
